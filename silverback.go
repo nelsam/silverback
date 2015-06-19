@@ -43,8 +43,10 @@ func (r *Router) Route(handler Handler) {
 		idAllowed = append(idAllowed, "DELETE")
 	}
 	if len(idAllowed) > 0 {
+		idAllowed = append(idAllowed, "OPTIONS")
 		route := r.Path(idRoutePath)
 		subRouter := route.Subrouter()
+		subRouter.Methods("OPTIONS").HandlerFunc(optionsHandler(idAllowed))
 		if hasGetter {
 			subRouter.Methods("GET").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				h := handler.New(r).(Getter)
@@ -79,9 +81,7 @@ func (r *Router) Route(handler Handler) {
 			})
 		}
 		route.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			for _, method := range idAllowed {
-				w.Header().Add("Allow", method)
-			}
+			writeAllowHeader(idAllowed, w)
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		})
 	}
@@ -96,8 +96,10 @@ func (r *Router) Route(handler Handler) {
 		allowed = append(allowed, "POST")
 	}
 	if len(allowed) > 0 {
+		allowed = append(allowed, "OPTIONS")
 		route := r.Path(routePath)
 		subRouter := route.Subrouter()
+		subRouter.Methods("OPTIONS").HandlerFunc(optionsHandler(allowed))
 		if hasQuerier {
 			subRouter.Methods("GET").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				h := handler.New(r).(Querier)
@@ -123,6 +125,19 @@ func (r *Router) Route(handler Handler) {
 			}
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		})
+	}
+}
+
+func optionsHandler(methods []string) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		writeAllowHeader(methods, w)
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func writeAllowHeader(methods []string, w http.ResponseWriter) {
+	for _, method := range methods {
+		w.Header().Add("Allow", method)
 	}
 }
 
