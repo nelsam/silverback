@@ -120,9 +120,7 @@ func (r *Router) Route(handler Handler) {
 			})
 		}
 		route.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			for _, method := range allowed {
-				w.Header().Add("Allow", method)
-			}
+			writeAllowHeader(allowed, w)
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		})
 	}
