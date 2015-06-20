@@ -1,9 +1,6 @@
 package silverback
 
-import (
-	"encoding/json"
-	"net/http"
-)
+import "encoding/json"
 
 // A Codec contains methods for marshaling and unmarshaling data.
 type Codec interface {
@@ -13,7 +10,7 @@ type Codec interface {
 	// map[string]string{"encoding":"utf-8"} as the options argument.
 	New(options map[string]string) Codec
 
-	Match(*http.Request) bool
+	Match(MIMEType) bool
 	Marshal(target interface{}) ([]byte, error)
 	Unmarshal(raw []byte, targetAddr interface{}) error
 }
@@ -28,11 +25,11 @@ func (j *JSON) New(map[string]string) Codec {
 	return j
 }
 
-// Match returns whether or not the provided request is asking for the
-// JSON codec.  This is usually from an entry in the Accept header.
-func (j *JSON) Match(r *http.Request) bool {
+// Match returns whether or not the provided MIMEtype matches the JSON
+// codec.
+func (j *JSON) Match(mime MIMEType) bool {
 	// Simplest cases
-	switch r.Header.Get("Accept") {
+	switch mime.Name {
 	case "application/json", "text/json":
 		return true
 	}

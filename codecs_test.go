@@ -14,6 +14,7 @@ var _ = Describe("Codecs", func() {
 	var (
 		codec silverback.Codec
 		req   *http.Request
+		mime  silverback.MIMEType
 	)
 
 	Context("json", func() {
@@ -30,14 +31,19 @@ var _ = Describe("Codecs", func() {
 			Expect(isJSON).To(BeTrue())
 		})
 
-		It("matches a request for application/json", func() {
-			req.Header.Set("Accept", "application/json")
-			Expect(codec.Match(req)).To(BeTrue())
+		It("matches an application/json MIME type", func() {
+			mime.Name = "application/json"
+			Expect(codec.Match(mime)).To(BeTrue())
 		})
 
-		It("matches a request for text/json", func() {
-			req.Header.Set("Accept", "text/json")
-			Expect(codec.Match(req)).To(BeTrue())
+		It("matches a text/json MIME type", func() {
+			mime.Name = "text/json"
+			Expect(codec.Match(mime)).To(BeTrue())
+		})
+
+		It("doesn't match a text/xml MIME type", func() {
+			mime.Name = "text/xml"
+			Expect(codec.Match(mime)).To(BeFalse())
 		})
 
 		It("marshals to proper json", func() {
