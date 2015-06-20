@@ -24,8 +24,10 @@ var _ = Describe("Codecs", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("returns itself when a new copy is requested", func() {
-			Expect(codec.New(map[string]string{})).To(Equal(codec))
+		It("returns a json codec when a new copy is requested", func() {
+			newCodec := codec.New(map[string]string{})
+			_, isJSON := newCodec.(*silverback.JSON)
+			Expect(isJSON).To(BeTrue())
 		})
 
 		It("matches a request for application/json", func() {
