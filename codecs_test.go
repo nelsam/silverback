@@ -48,6 +48,12 @@ var _ = Describe("Codecs", func() {
 			Expect(codec.Marshal(val)).To(MatchJSON(expected))
 		})
 
+		It("errors from improper json", func() {
+			raw := []byte(`{"foo":"bar","baz":3.0,}`)
+			m := map[string]string{}
+			Expect(json.Unmarshal(raw, &m)).To(HaveOccurred())
+		})
+
 		It("unmarshals from proper json", func() {
 			raw := []byte(`{"foo":"bar","baz":3.0}`)
 			var expected, actual map[string]interface{}
