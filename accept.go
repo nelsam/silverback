@@ -110,6 +110,15 @@ func (entry *AcceptEntry) Wildcards() int {
 	return strings.Count(entry.Name, "*")
 }
 
+func (entry *AcceptEntry) bestCodec(codecs []Codec) Codec {
+	for _, codec := range codecs {
+		if codec.Match(entry.MIMEType) {
+			return codec
+		}
+	}
+	return nil
+}
+
 // Accept stores all values in an Accept header.
 type Accept []*AcceptEntry
 
@@ -170,7 +179,17 @@ func ParseAcceptHeader(acceptHeader string) Accept {
 // for the Accept header.
 func (accept Accept) Codec(codecs []Codec) Codec {
 	if len(codecs) > 0 {
-		return codecs[0]
+		return accept.bestCodec(codecs)
+	}
+	return nil
+}
+
+func (accept Accept) bestCodec(codecs []Codec) Codec {
+	for _, entry := range accept {
+		codec := entry.bestCodec(codecs)
+		if codec != nil {
+			return codec
+		}
 	}
 	return nil
 }

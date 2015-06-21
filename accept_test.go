@@ -249,13 +249,47 @@ var _ = Describe("Accept", func() {
 				codecs = []silverback.Codec{&mockCodec{}, &mockCodec{}}
 			})
 
-			It("returns a codec if the accept header is empty, but codecs is not", func() {
-				Expect(accept.Codec(codecs)).ToNot(BeNil())
+			It("returns nil if the accept header is empty", func() {
+				Expect(accept.Codec(codecs)).To(BeNil())
 			})
 		})
 
-		PContext("Non-Empty", func() {
+		Context("Non-Empty Accept Header", func() {
+			var (
+				mockJSON = &mockCodec{
+					matcher: func(mime silverback.MIMEType) bool {
+						return mime.Name == "application/json"
+					},
+				}
+				mockXML = &mockCodec{
+					matcher: func(mime silverback.MIMEType) bool {
+						return mime.Name == "text/xml"
+					},
+				}
+				mockGibberish = &mockCodec{
+					matcher: func(mime silverback.MIMEType) bool {
+						return mime.Name == "gibberish"
+					},
+				}
+			)
 			BeforeEach(func() {
+				accept = silverback.Accept{
+					silverback.ParseAcceptEntry("application/json"),
+					silverback.ParseAcceptEntry("text/xml"),
+				}
+			})
+
+			It("returns the first matching codec", func() {
+				codecs = []silverback.Codec{mockXML, mockJSON}
+				Expect(accept.Codec(codecs)).To(Equal(mockJSON))
+
+				codecs = codecs[:1]
+				Expect(accept.Codec(codecs)).To(Equal(mockXML))
+			})
+
+			It("returns nil if there is no matching codec", func() {
+				codecs = []silverback.Codec{mockGibberish}
+				Expect(accept.Codec(codecs)).To(BeNil())
 			})
 		})
 	})
