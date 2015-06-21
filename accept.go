@@ -1,6 +1,7 @@
 package silverback
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -105,8 +106,32 @@ func (entry *AcceptEntry) Quality() float32 {
 	return entry.quality
 }
 
+func (entry *AcceptEntry) Wildcards() int {
+	return strings.Count(entry.Name, "*")
+}
+
 // Accept stores all values in an Accept header.
-type Accept []AcceptEntry
+type Accept []*AcceptEntry
+
+// Len returns the length of accept.
+func (accept Accept) Len() int {
+	return len(accept)
+}
+
+// Less returns whether or not accept[i] should be earlier in a sorted
+// list than accept[j] (i.e. accept[i] should be preferred over
+// accept[j]), according to RFC 2616 section 14.1.
+func (accept Accept) Less(i, j int) bool {
+	if accept[i].Quality() != accept[j].Quality() {
+		return accept[i].Quality() > accept[j].Quality()
+	}
+	return accept[i].Wildcards() < accept[j].Wildcards()
+}
+
+// Swap swaps accept[i] and accept[j].
+func (accept Accept) Swap(i, j int) {
+	accept[i], accept[j] = accept[j], accept[i]
+}
 
 // runeSplit performs strings.Split, but with a rune instead of a
 // string.
@@ -125,20 +150,25 @@ func runeSplit(value string, split rune) []string {
 }
 
 // ParseAcceptHeader parses an Accept header value into a *Accept.
-func ParseAcceptHeader(accept string) *Accept {
-	return nil
-}
-
-// order reorders the entries from an Accept header according to
-// RFC2616, section 14.1.
-func (accept *Accept) order() {
+func ParseAcceptHeader(acceptHeader string) Accept {
+	if acceptHeader == "" {
+		return nil
+	}
+	entries := strings.FieldsFunc(acceptHeader, isAcceptSplit)
+	accept := make(Accept, 0, len(entries))
+	for _, entry := range entries {
+		entry = strings.TrimSpace(entry)
+		accept = append(accept, ParseAcceptEntry(entry))
+	}
+	sort.Sort(accept)
+	return accept
 }
 
 // Codec returns the best codec in codecs for this accept header.  It
 // automatically sorts the entries based on RFC2616 section 14.1 prior
 // to ranging through them, to ensure the codec it loads is optimal
 // for the Accept header.
-func (accept *Accept) Codec(codecs []Codec) Codec {
+func (accept Accept) Codec(codecs []Codec) Codec {
 	if len(codecs) > 0 {
 		return codecs[0]
 	}

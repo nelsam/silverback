@@ -1,6 +1,8 @@
 package silverback_test
 
 import (
+	"sort"
+
 	"github.com/nelsam/silverback"
 
 	. "github.com/onsi/ginkgo"
@@ -148,15 +150,91 @@ var _ = Describe("Accept", func() {
 		})
 	})
 
-	Context("Accept", func() {
+	Context("Accept Header Parsing", func() {
 		var (
-			accept *silverback.Accept
+			acceptString string
+			accept       silverback.Accept
+		)
+
+		JustBeforeEach(func() {
+			accept = silverback.ParseAcceptHeader(acceptString)
+		})
+
+		Context("Empty Header", func() {
+			BeforeEach(func() {
+				acceptString = ""
+			})
+
+			It("returns an empty slice", func() {
+				Expect(accept).To(BeEmpty())
+			})
+		})
+
+		Context("Single Header Entry", func() {
+			BeforeEach(func() {
+				acceptString = "application/json"
+			})
+
+			It("returns a single entry", func() {
+				Expect(accept).To(HaveLen(1))
+				Expect(accept[0].Name).To(Equal("application/json"))
+			})
+		})
+
+		Context("Multiple Simple Entries", func() {
+			var expected silverback.Accept
+
+			BeforeEach(func() {
+				acceptString = "application/json, text/xml"
+				jsonEntry := silverback.ParseAcceptEntry("application/json")
+				xmlEntry := silverback.ParseAcceptEntry("text/xml")
+				expected = silverback.Accept{jsonEntry, xmlEntry}
+				// sort them to ensure all operations done during
+				// sorting are done on the expected entries, too.
+				sort.Sort(expected)
+			})
+
+			It("returns multiple entries", func() {
+				Expect(accept).To(HaveLen(2))
+				Expect(accept).To(BeEquivalentTo(expected))
+			})
+		})
+
+		Context("Sorting", func() {
+			var orderedNames = []string{
+				"application/json", // default quality, 0.1
+				"text/xml",         // quality 0.9
+				"text/*",           // quality 0.9, less specific
+				"text/html",        // quality 0.8
+				"image/jpeg",       // quality 0.3
+				"image/*",          // quality 0.3, less specific
+				"*/*",              // quality 0.3, least specific
+			}
+
+			BeforeEach(func() {
+				// Avoid any ambiguous sorting - nothing at the same
+				// quality with the same specificity.
+				acceptString = "image/*; q=0.3, text/html; q=0.8, image/jpeg; q=0.3, application/json, text/xml; q=0.9, text/*; q=0.9, */*; q=0.3"
+			})
+
+			It("sorts the accept header according to RFC 2616", func() {
+				Expect(accept).To(HaveLen(len(orderedNames)))
+				for index, name := range orderedNames {
+					Expect(accept[index].Name).To(Equal(name))
+				}
+			})
+		})
+	})
+
+	Context("Accept Codec", func() {
+		var (
+			accept silverback.Accept
 			codecs []silverback.Codec
 		)
 
 		Context("Empty Codecs", func() {
 			BeforeEach(func() {
-				accept = &silverback.Accept{silverback.AcceptEntry{}}
+				accept = silverback.Accept{&silverback.AcceptEntry{}}
 				codecs = []silverback.Codec{}
 			})
 
@@ -167,7 +245,7 @@ var _ = Describe("Accept", func() {
 
 		Context("Empty Accept Header", func() {
 			BeforeEach(func() {
-				accept = &silverback.Accept{}
+				accept = silverback.Accept{}
 				codecs = []silverback.Codec{&mockCodec{}, &mockCodec{}}
 			})
 
@@ -178,7 +256,6 @@ var _ = Describe("Accept", func() {
 
 		PContext("Non-Empty", func() {
 			BeforeEach(func() {
-
 			})
 		})
 	})
