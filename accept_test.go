@@ -8,6 +8,79 @@ import (
 )
 
 var _ = Describe("Accept", func() {
+	Context("MIMEType", func() {
+		var (
+			mimeString    string
+			mime          silverback.MIMEType
+			acceptOptions map[string]string
+		)
+
+		JustBeforeEach(func() {
+			mime, acceptOptions = silverback.ParseMIMEType(mimeString)
+		})
+
+		Context("No Params", func() {
+			BeforeEach(func() {
+				mimeString = "application/json"
+			})
+
+			It("parses a MIME type without params", func() {
+				Expect(mime.Name).To(Equal("application/json"))
+				Expect(mime.Options).To(BeEmpty())
+				Expect(acceptOptions).To(BeEmpty())
+			})
+		})
+
+		Context("MIME Params", func() {
+			var expectedOptions = map[string]string{
+				"foo": "bar",
+				"baz": "bacon",
+			}
+			BeforeEach(func() {
+				mimeString = "application/json; foo=bar; baz=bacon"
+			})
+
+			It("parses a MIME type with params", func() {
+				Expect(mime.Name).To(Equal("application/json"))
+				Expect(mime.Options).To(BeEquivalentTo(expectedOptions))
+				Expect(acceptOptions).To(BeEmpty())
+			})
+		})
+
+		Context("Quality Param", func() {
+			BeforeEach(func() {
+				mimeString = "application/json; q=0.1"
+			})
+
+			It("parses a quality param without any other params", func() {
+				Expect(mime.Name).To(Equal("application/json"))
+				Expect(mime.Options).To(BeEmpty())
+				Expect(acceptOptions).To(HaveKeyWithValue("q", "0.1"))
+			})
+		})
+
+		Context("MIME and Accept params", func() {
+			var (
+				expectedMIMEOptions = map[string]string{
+					"foo": "bar",
+				}
+				expectedAcceptOptions = map[string]string{
+					"q":     "0.2",
+					"bacon": "eggs",
+				}
+			)
+			BeforeEach(func() {
+				mimeString = "application/json; foo=bar; q=0.2; bacon=eggs"
+			})
+
+			It("parses MIME and Accept params separately", func() {
+				Expect(mime.Name).To(Equal("application/json"))
+				Expect(mime.Options).To(BeEquivalentTo(expectedMIMEOptions))
+				Expect(acceptOptions).To(BeEquivalentTo(expectedAcceptOptions))
+			})
+		})
+	})
+
 	Context("AcceptEntry", func() {
 		var (
 			options map[string]string
@@ -16,10 +89,12 @@ var _ = Describe("Accept", func() {
 
 		JustBeforeEach(func() {
 			mimeType := silverback.MIMEType{
-				Name:    "foo",
-				Options: options,
+				Name: "foo",
 			}
-			entry = &silverback.AcceptEntry{MIMEType: mimeType}
+			entry = &silverback.AcceptEntry{
+				MIMEType:      mimeType,
+				AcceptOptions: options,
+			}
 		})
 
 		Context("Defaults", func() {
