@@ -34,10 +34,10 @@ var _ = Describe("Accept", func() {
 		Context("MIME Params", func() {
 			var expectedOptions = map[string]string{
 				"foo": "bar",
-				"baz": "bacon",
+				"baz": "",
 			}
 			BeforeEach(func() {
-				mimeString = "application/json; foo=bar; baz=bacon"
+				mimeString = "application/json; foo=bar; baz"
 			})
 
 			It("parses a MIME type with params", func() {
@@ -81,7 +81,24 @@ var _ = Describe("Accept", func() {
 		})
 	})
 
-	Context("AcceptEntry", func() {
+	Context("AcceptEntry Parsing", func() {
+		It("parses accept-params", func() {
+			entryString := "application/json; foo=bar; q=0.1; bacon=eggs"
+			expectedOptions := map[string]string{"foo": "bar"}
+			expectedAcceptOptions := map[string]string{
+				"q":     "0.1",
+				"bacon": "eggs",
+			}
+
+			entry := silverback.ParseAcceptEntry(entryString)
+			Expect(entry.Name).To(Equal("application/json"))
+			Expect(entry.Options).To(BeEquivalentTo(expectedOptions))
+			Expect(entry.AcceptOptions).To(BeEquivalentTo(expectedAcceptOptions))
+			Expect(entry.Quality()).To(Equal(float32(0.1)))
+		})
+	})
+
+	Context("AcceptEntry Quality", func() {
 		var (
 			options map[string]string
 			entry   *silverback.AcceptEntry
