@@ -1,10 +1,11 @@
-package silverback_test
+package codecs_test
 
 import (
 	"encoding/json"
 	"net/http"
 
 	"github.com/nelsam/silverback"
+	"github.com/nelsam/silverback/codecs"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -19,7 +20,7 @@ var _ = Describe("Codecs", func() {
 
 	Context("json", func() {
 		BeforeEach(func() {
-			codec = &silverback.JSON{}
+			codec = &codecs.JSON{}
 			var err error
 			req, err = http.NewRequest("GET", "foo", nil)
 			Expect(err).ToNot(HaveOccurred())
@@ -27,7 +28,7 @@ var _ = Describe("Codecs", func() {
 
 		It("returns a json codec when a new copy is requested", func() {
 			newCodec := codec.New(map[string]string{})
-			_, isJSON := newCodec.(*silverback.JSON)
+			_, isJSON := newCodec.(*codecs.JSON)
 			Expect(isJSON).To(BeTrue())
 		})
 

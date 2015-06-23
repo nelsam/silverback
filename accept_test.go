@@ -27,7 +27,8 @@ var _ = Describe("Accept", func() {
 			})
 
 			It("parses a MIME type without params", func() {
-				Expect(mime.Name).To(Equal("application/json"))
+				Expect(mime.Type).To(Equal("application"))
+				Expect(mime.SubType).To(Equal("json"))
 				Expect(mime.Options).To(BeEmpty())
 				Expect(acceptOptions).To(BeEmpty())
 			})
@@ -43,7 +44,8 @@ var _ = Describe("Accept", func() {
 			})
 
 			It("parses a MIME type with params", func() {
-				Expect(mime.Name).To(Equal("application/json"))
+				Expect(mime.Type).To(Equal("application"))
+				Expect(mime.SubType).To(Equal("json"))
 				Expect(mime.Options).To(BeEquivalentTo(expectedOptions))
 				Expect(acceptOptions).To(BeEmpty())
 			})
@@ -55,7 +57,8 @@ var _ = Describe("Accept", func() {
 			})
 
 			It("parses a quality param without any other params", func() {
-				Expect(mime.Name).To(Equal("application/json"))
+				Expect(mime.Type).To(Equal("application"))
+				Expect(mime.SubType).To(Equal("json"))
 				Expect(mime.Options).To(BeEmpty())
 				Expect(acceptOptions).To(HaveKeyWithValue("q", "0.1"))
 			})
@@ -76,7 +79,8 @@ var _ = Describe("Accept", func() {
 			})
 
 			It("parses MIME and Accept params separately", func() {
-				Expect(mime.Name).To(Equal("application/json"))
+				Expect(mime.Type).To(Equal("application"))
+				Expect(mime.SubType).To(Equal("json"))
 				Expect(mime.Options).To(BeEquivalentTo(expectedMIMEOptions))
 				Expect(acceptOptions).To(BeEquivalentTo(expectedAcceptOptions))
 			})
@@ -93,7 +97,8 @@ var _ = Describe("Accept", func() {
 			}
 
 			entry := silverback.ParseAcceptEntry(entryString)
-			Expect(entry.Name).To(Equal("application/json"))
+			Expect(entry.Type).To(Equal("application"))
+			Expect(entry.SubType).To(Equal("json"))
 			Expect(entry.Options).To(BeEquivalentTo(expectedOptions))
 			Expect(entry.AcceptOptions).To(BeEquivalentTo(expectedAcceptOptions))
 			Expect(entry.Quality()).To(Equal(float32(0.1)))
@@ -108,7 +113,7 @@ var _ = Describe("Accept", func() {
 
 		JustBeforeEach(func() {
 			mimeType := silverback.MIMEType{
-				Name: "foo",
+				Type: "foo",
 			}
 			entry = &silverback.AcceptEntry{
 				MIMEType:      mimeType,
@@ -177,7 +182,8 @@ var _ = Describe("Accept", func() {
 
 			It("returns a single entry", func() {
 				Expect(accept).To(HaveLen(1))
-				Expect(accept[0].Name).To(Equal("application/json"))
+				Expect(accept[0].Type).To(Equal("application"))
+				Expect(accept[0].SubType).To(Equal("json"))
 			})
 		})
 
@@ -220,7 +226,10 @@ var _ = Describe("Accept", func() {
 			It("sorts the accept header according to RFC 2616", func() {
 				Expect(accept).To(HaveLen(len(orderedNames)))
 				for index, name := range orderedNames {
-					Expect(accept[index].Name).To(Equal(name))
+					expectedMIME, _ := silverback.ParseMIMEType(name)
+					actual := accept[index]
+					Expect(actual.Type).To(Equal(expectedMIME.Type))
+					Expect(actual.SubType).To(Equal(expectedMIME.SubType))
 				}
 			})
 		})
@@ -254,24 +263,13 @@ var _ = Describe("Accept", func() {
 			})
 		})
 
-		Context("Non-Empty Accept Header", func() {
+		Context("Direct Match", func() {
 			var (
-				mockJSON = &mockCodec{
-					matcher: func(mime silverback.MIMEType) bool {
-						return mime.Name == "application/json"
-					},
-				}
-				mockXML = &mockCodec{
-					matcher: func(mime silverback.MIMEType) bool {
-						return mime.Name == "text/xml"
-					},
-				}
-				mockGibberish = &mockCodec{
-					matcher: func(mime silverback.MIMEType) bool {
-						return mime.Name == "gibberish"
-					},
-				}
+				mockJSON      = makeCodec("application", "json")
+				mockXML       = makeCodec("text", "xml")
+				mockGibberish = makeCodec("gibberish", "doomsday")
 			)
+
 			BeforeEach(func() {
 				accept = silverback.Accept{
 					silverback.ParseAcceptEntry("application/json"),
@@ -290,6 +288,22 @@ var _ = Describe("Accept", func() {
 			It("returns nil if there is no matching codec", func() {
 				codecs = []silverback.Codec{mockGibberish}
 				Expect(accept.Codec(codecs)).To(BeNil())
+			})
+		})
+
+		Context("Wildcard Match", func() {
+			var (
+				mockJSON = makeCodec("application", "json")
+			)
+
+			BeforeEach(func() {
+				accept = silverback.Accept{
+					silverback.ParseAcceptEntry("application/*"),
+				}
+			})
+
+			It("returns codecs matching wildcard values", func() {
+				Expect(accept.Codec([]silverback.Codec{mockJSON})).To(Equal(mockJSON))
 			})
 		})
 	})

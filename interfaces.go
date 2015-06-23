@@ -22,7 +22,7 @@ type BeforeHandler interface {
 // response's fields.
 type AfterHandler interface {
 	Handler
-	AfterHandle(Response) error
+	AfterHandle(*Response) error
 }
 
 // A Getter is a controller type that can handle GET requests for a
@@ -31,36 +31,36 @@ type AfterHandler interface {
 // Note: HEAD requests will automatically map to
 type Getter interface {
 	Handler
-	Get(identifier string) Response
+	Get(identifier string) *Response
 }
 
 // A Querier is a controller type that can handle GET requests that
 // query for multiple instances of a resource.
 type Querier interface {
 	Handler
-	Query() Response
+	Query() *Response
 }
 
 // A Poster is a controller type that can handle POST requests.
 type Poster interface {
 	Handler
-	Post() Response
+	Post() *Response
 }
 
 // A Putter is a controller type that can handle PUT requests.
 type Putter interface {
 	Handler
-	Put(identifier string) Response
+	Put(identifier string) *Response
 }
 
 // A Patcher is a controller type that can handle PATCH requests.
 type Patcher interface {
 	Handler
-	Patch(identifier string) Response
+	Patch(identifier string) *Response
 }
 
 // A Deleter is a controller type that can handle DELETE requests.
 type Deleter interface {
 	Handler
-	Delete(identifier string) Response
+	Delete(identifier string) *Response
 }

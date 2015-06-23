@@ -17,7 +17,8 @@ func (o Options) Add(key, value string) {
 // MIMEType stores a full MIME type for Accept and Content-Type
 // headers.
 type MIMEType struct {
-	Name    string
+	Type    string
+	SubType string
 	Options Options
 }
 
@@ -36,14 +37,20 @@ type MIMEType struct {
 // types; otherwise, just add the acceptOptions key/value pairs to
 // mime.Options.
 func ParseMIMEType(value string) (mime MIMEType, acceptOptions Options) {
-	nameEnd := strings.IndexRune(value, ';')
-	if nameEnd == -1 {
-		mime.Name = value
+	typeEnd := strings.IndexRune(value, '/')
+	if typeEnd == -1 {
+		return MIMEType{}, nil
+	}
+	mime.Type = value[:typeEnd]
+	value = value[typeEnd+1:]
+	subTypeEnd := strings.IndexRune(value, ';')
+	if subTypeEnd == -1 {
+		mime.SubType = value
 		return mime, nil
 	}
-	mime.Name = value[:nameEnd]
+	mime.SubType = value[:subTypeEnd]
 	mime.Options = make(Options)
-	start := nameEnd + 1
+	start := subTypeEnd + 1
 	options := strings.FieldsFunc(value[start:], isOptionSplit)
 	qFound := false
 	for _, option := range options {
@@ -107,12 +114,35 @@ func (entry *AcceptEntry) Quality() float32 {
 }
 
 func (entry *AcceptEntry) Wildcards() int {
-	return strings.Count(entry.Name, "*")
+	if entry.Type == "*" {
+		// Must be */*, since */sub-type is not valid.
+		return 2
+	}
+	if entry.SubType == "*" {
+		return 1
+	}
+	return 0
+}
+
+func (entry *AcceptEntry) match(codec Codec) bool {
+	if entry.MIMEType.Type == "*" {
+		return true
+	}
+	codecTypes := codec.Types()
+	for _, supported := range codecTypes {
+		if supported.Type != entry.MIMEType.Type {
+			continue
+		}
+		if entry.MIMEType.SubType == "*" || entry.MIMEType.SubType == supported.SubType {
+			return true
+		}
+	}
+	return false
 }
 
 func (entry *AcceptEntry) bestCodec(codecs []Codec) Codec {
 	for _, codec := range codecs {
-		if codec.Match(entry.MIMEType) {
+		if entry.match(codec) {
 			return codec
 		}
 	}

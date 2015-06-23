@@ -4,9 +4,20 @@ import "github.com/nelsam/silverback"
 
 type mockCodec struct {
 	silverback.Codec
-	matcher func(mime silverback.MIMEType) bool
+	types []silverback.MIMEType
 }
 
-func (m mockCodec) Match(mime silverback.MIMEType) bool {
-	return m.matcher(mime)
+func makeCodec(mimeType, mimeSubType string) *mockCodec {
+	return &mockCodec{
+		types: []silverback.MIMEType{
+			{
+				Type:    mimeType,
+				SubType: mimeSubType,
+			},
+		},
+	}
+}
+
+func (m *mockCodec) Types() []silverback.MIMEType {
+	return m.types
 }
