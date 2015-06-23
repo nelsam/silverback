@@ -27,7 +27,15 @@ type Response struct {
 // NewResponse returns a *Response set up to correspond to r.  r will
 // not be processed until it is needed (for example, when Codec() is
 // called, but SetCodec() has not been called).
-func NewResponse(r *http.Request, codecs []Codec) *Response {
+func NewResponse(r *http.Request) *Response {
+	return &Response{
+		request: r,
+	}
+}
+
+// NewResponseForCodecs creates a response restricted to a slice of
+// codecs.  This will override any codecs added to the *Router.
+func NewResponseForCodecs(r *http.Request, codecs []Codec) *Response {
 	return &Response{
 		request: r,
 		codecs:  codecs,

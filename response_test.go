@@ -25,7 +25,7 @@ var _ = Describe("Response", func() {
 			makeCodec("text", "xml"),
 			mockJSON,
 		}
-		resp = silverback.NewResponse(req, codecs)
+		resp = silverback.NewResponseForCodecs(req, codecs)
 	})
 
 	It("doesn't overwrite codecs that are set manually", func() {

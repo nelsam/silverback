@@ -1,29 +1,22 @@
 package silverback
 
 import (
+	"fmt"
 	"net/http"
 	"path"
 
 	"github.com/gorilla/mux"
 )
 
-// A Response is a container for typical response fields.
-type Response struct {
-	Status  int
-	Headers http.Header
-	Body    interface{}
-}
-
 // A Router is an extension of "github.com/gorilla/mux".Router.
 type Router struct {
 	mux.Router
+
+	codecs []Codec
 }
 
-// Route routes the methods on Handler to paths, based on the
-// Handler's Path().
-func (r *Router) Route(handler Handler) {
-	routePath := handler.Path()
-	idRoutePath := path.Join(routePath, "{id}")
+func (r *Router) setupIDPaths(handler Handler) {
+	idRoutePath := path.Join(handler.Path(), "{id}")
 
 	_, hasGetter := handler.(Getter)
 	_, hasPutter := handler.(Putter)
@@ -48,43 +41,47 @@ func (r *Router) Route(handler Handler) {
 		subRouter := route.Subrouter()
 		subRouter.Methods("OPTIONS").HandlerFunc(optionsHandler(idAllowed))
 		if hasGetter {
-			subRouter.Methods("GET").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				h := handler.New(r).(Getter)
-				resp := idHandle(h, h.Get, mux.Vars(r)["id"])
-				writeResponse(resp, w)
+			subRouter.Methods("GET").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+				h := handler.New(req).(Getter)
+				resp := idHandle(h, h.Get, mux.Vars(req)["id"])
+				writeResponse(writer, resp, r.codecs)
 			})
-			subRouter.Methods("HEAD").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				h := handler.New(r).(Getter)
-				resp := idHandle(h, h.Get, mux.Vars(r)["id"])
-				writeHead(resp, w)
+			subRouter.Methods("HEAD").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+				h := handler.New(req).(Getter)
+				resp := idHandle(h, h.Get, mux.Vars(req)["id"])
+				writeHead(writer, resp)
 			})
 		}
 		if hasPutter {
-			subRouter.Methods("PUT").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				h := handler.New(r).(Putter)
-				resp := idHandle(h, h.Put, mux.Vars(r)["id"])
-				writeResponse(resp, w)
+			subRouter.Methods("PUT").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+				h := handler.New(req).(Putter)
+				resp := idHandle(h, h.Put, mux.Vars(req)["id"])
+				writeResponse(writer, resp, r.codecs)
 			})
 		}
 		if hasPatcher {
-			subRouter.Methods("PATCH").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				h := handler.New(r).(Patcher)
-				resp := idHandle(h, h.Patch, mux.Vars(r)["id"])
-				writeResponse(resp, w)
+			subRouter.Methods("PATCH").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+				h := handler.New(req).(Patcher)
+				resp := idHandle(h, h.Patch, mux.Vars(req)["id"])
+				writeResponse(writer, resp, r.codecs)
 			})
 		}
 		if hasDeleter {
-			subRouter.Methods("DELETE").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				h := handler.New(r).(Deleter)
-				resp := idHandle(h, h.Delete, mux.Vars(r)["id"])
-				writeResponse(resp, w)
+			subRouter.Methods("DELETE").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+				h := handler.New(req).(Deleter)
+				resp := idHandle(h, h.Delete, mux.Vars(req)["id"])
+				writeResponse(writer, resp, r.codecs)
 			})
 		}
-		route.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			writeAllowHeader(idAllowed, w)
-			w.WriteHeader(http.StatusMethodNotAllowed)
+		route.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+			writeAllowHeader(idAllowed, writer)
+			writer.WriteHeader(http.StatusMethodNotAllowed)
 		})
 	}
+}
+
+func (r *Router) setupNonIDPaths(handler Handler) {
+	routePath := handler.Path()
 
 	_, hasQuerier := handler.(Querier)
 	_, hasPoster := handler.(Poster)
@@ -101,45 +98,59 @@ func (r *Router) Route(handler Handler) {
 		subRouter := route.Subrouter()
 		subRouter.Methods("OPTIONS").HandlerFunc(optionsHandler(allowed))
 		if hasQuerier {
-			subRouter.Methods("GET").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				h := handler.New(r).(Querier)
+			subRouter.Methods("GET").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+				h := handler.New(req).(Querier)
 				resp := handle(h, h.Query)
-				writeResponse(resp, w)
+				writeResponse(writer, resp, r.codecs)
 			})
-			subRouter.Methods("HEAD").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				h := handler.New(r).(Querier)
+			subRouter.Methods("HEAD").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+				h := handler.New(req).(Querier)
 				resp := handle(h, h.Query)
-				writeHead(resp, w)
+				writeHead(writer, resp)
 			})
 		}
 		if hasPoster {
-			subRouter.Methods("POST").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				h := handler.New(r).(Poster)
+			subRouter.Methods("POST").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+				h := handler.New(req).(Poster)
 				resp := handle(h, h.Post)
-				writeResponse(resp, w)
+				writeResponse(writer, resp, r.codecs)
 			})
 		}
-		route.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			writeAllowHeader(allowed, w)
-			w.WriteHeader(http.StatusMethodNotAllowed)
+		route.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+			writeAllowHeader(allowed, writer)
+			writer.WriteHeader(http.StatusMethodNotAllowed)
 		})
 	}
 }
 
+// AddCodec registers a codec with this router.  Any codecs added in
+// this way will be supplied to any *Response value that has not had
+// its codecs set (via NewResponseForCodecs).
+func (r *Router) AddCodec(codec Codec) {
+	r.codecs = append(r.codecs, codec)
+}
+
+// Route routes the methods on Handler to paths, based on the
+// Handler's Path().
+func (r *Router) Route(handler Handler) {
+	r.setupIDPaths(handler)
+	r.setupNonIDPaths(handler)
+}
+
 func optionsHandler(methods []string) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		writeAllowHeader(methods, w)
-		w.WriteHeader(http.StatusNoContent)
+	return func(writer http.ResponseWriter, r *http.Request) {
+		writeAllowHeader(methods, writer)
+		writer.WriteHeader(http.StatusNoContent)
 	}
 }
 
-func writeAllowHeader(methods []string, w http.ResponseWriter) {
+func writeAllowHeader(methods []string, writer http.ResponseWriter) {
 	for _, method := range methods {
-		w.Header().Add("Allow", method)
+		writer.Header().Add("Allow", method)
 	}
 }
 
-func handle(h Handler, f func() Response) Response {
+func handle(h Handler, f func() *Response) *Response {
 	if before, ok := h.(BeforeHandler); ok {
 		before.BeforeHandle()
 	}
@@ -150,7 +161,7 @@ func handle(h Handler, f func() Response) Response {
 	return resp
 }
 
-func idHandle(h Handler, f func(string) Response, id string) Response {
+func idHandle(h Handler, f func(string) *Response, id string) *Response {
 	if before, ok := h.(BeforeHandler); ok {
 		before.BeforeHandle()
 	}
@@ -161,25 +172,35 @@ func idHandle(h Handler, f func(string) Response, id string) Response {
 	return resp
 }
 
-func writeHeaders(resp Response, w http.ResponseWriter) {
+func writeHeaders(writer http.ResponseWriter, resp *Response) {
 	for name, values := range resp.Headers {
 		for _, v := range values {
-			w.Header().Add(name, v)
+			writer.Header().Add(name, v)
 		}
 	}
 }
 
-func writeHead(resp Response, w http.ResponseWriter) {
-	writeHeaders(resp, w)
+func writeHead(writer http.ResponseWriter, resp *Response) {
+	writeHeaders(writer, resp)
 	if resp.Status < http.StatusBadRequest {
 		resp.Status = http.StatusNoContent
 	}
-	// TODO: write Content-Length
-	w.WriteHeader(resp.Status)
+	// TODO: Write Content-Length
+	writer.WriteHeader(resp.Status)
 }
 
-func writeResponse(resp Response, w http.ResponseWriter) {
-	writeHeaders(resp, w)
-	w.WriteHeader(resp.Status)
-	// TODO: Write body.
+func writeResponse(writer http.ResponseWriter, resp *Response, codecs []Codec) {
+	writeHeaders(writer, resp)
+	writer.WriteHeader(resp.Status)
+	if resp.codecs == nil {
+		resp.codecs = codecs
+	}
+	body, err := resp.Codec().Marshal(resp.Body)
+	if err != nil {
+		writer.WriteHeader(http.StatusInternalServerError)
+		msg := fmt.Sprintf("Error marshalling data: %v", err)
+		writer.Write([]byte(msg))
+		return
+	}
+	writer.Write(body)
 }
