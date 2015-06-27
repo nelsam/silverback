@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"strconv"
 
 	"github.com/gorilla/mux"
 )
@@ -49,7 +50,7 @@ func (r *Router) setupIDPaths(handler Handler) {
 			subRouter.Methods("HEAD").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
 				h := handler.New(req).(Getter)
 				resp := idHandle(h, h.Get, mux.Vars(req)["id"])
-				writeHead(writer, resp)
+				writeHead(writer, resp, r.codecs)
 			})
 		}
 		if hasPutter {
@@ -106,7 +107,7 @@ func (r *Router) setupNonIDPaths(handler Handler) {
 			subRouter.Methods("HEAD").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
 				h := handler.New(req).(Querier)
 				resp := handle(h, h.Query)
-				writeHead(writer, resp)
+				writeHead(writer, resp, r.codecs)
 			})
 		}
 		if hasPoster {
@@ -180,16 +181,7 @@ func writeHeaders(writer http.ResponseWriter, resp *Response) {
 	}
 }
 
-func writeHead(writer http.ResponseWriter, resp *Response) {
-	writeHeaders(writer, resp)
-	if resp.Status < http.StatusBadRequest {
-		resp.Status = http.StatusNoContent
-	}
-	// TODO: Write Content-Length
-	writer.WriteHeader(resp.Status)
-}
-
-func writeResponse(writer http.ResponseWriter, resp *Response, codecs []Codec) {
+func writeHead(writer http.ResponseWriter, resp *Response, codecs []Codec) (body []byte) {
 	writeHeaders(writer, resp)
 	writer.WriteHeader(resp.Status)
 	if resp.codecs == nil {
@@ -202,5 +194,12 @@ func writeResponse(writer http.ResponseWriter, resp *Response, codecs []Codec) {
 		writer.Write([]byte(msg))
 		return
 	}
+	writer.Header().Set("Content-Length", strconv.Itoa(len(body)))
+	writer.WriteHeader(resp.Status)
+	return body
+}
+
+func writeResponse(writer http.ResponseWriter, resp *Response, codecs []Codec) {
+	body := writeHead(writer, resp, codecs)
 	writer.Write(body)
 }
