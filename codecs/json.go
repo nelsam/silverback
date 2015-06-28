@@ -12,7 +12,7 @@ type JSON struct{}
 // New returns j.  This is because the JSON codec currently has no
 // context to alter, so there's no need to use a separate copy across
 // threads.
-func (j *JSON) New(map[string]string) silverback.Codec {
+func (j *JSON) New(silverback.MIMEType) silverback.Codec {
 	return j
 }
 

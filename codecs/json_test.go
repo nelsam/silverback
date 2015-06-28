@@ -26,7 +26,7 @@ var _ = Describe("Codecs", func() {
 		})
 
 		It("returns a json codec when a new copy is requested", func() {
-			newCodec := codec.New(map[string]string{})
+			newCodec := codec.New(silverback.MIMEType{})
 			_, isJSON := newCodec.(*codecs.JSON)
 			Expect(isJSON).To(BeTrue())
 		})
