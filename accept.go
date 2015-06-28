@@ -144,7 +144,7 @@ func (entry *AcceptEntry) match(codec Codec) bool {
 func (entry *AcceptEntry) bestCodec(codecs []Codec) Codec {
 	for _, codec := range codecs {
 		if entry.match(codec) {
-			return codec
+			return codec.New(entry.MIMEType)
 		}
 	}
 	return nil
