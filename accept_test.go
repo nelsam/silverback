@@ -1,6 +1,7 @@
 package silverback_test
 
 import (
+	"net/http"
 	"sort"
 
 	"github.com/nelsam/silverback"
@@ -157,17 +158,17 @@ var _ = Describe("Accept", func() {
 
 	Context("Accept Header Parsing", func() {
 		var (
-			acceptString string
-			accept       silverback.Accept
+			accept  silverback.Accept
+			headers http.Header
 		)
 
 		JustBeforeEach(func() {
-			accept = silverback.ParseAcceptHeader(acceptString)
+			accept = silverback.ParseAcceptHeader(headers)
 		})
 
 		Context("Empty Header", func() {
 			BeforeEach(func() {
-				acceptString = ""
+				headers = http.Header{}
 			})
 
 			It("returns an empty slice", func() {
@@ -177,7 +178,7 @@ var _ = Describe("Accept", func() {
 
 		Context("Single Header Entry", func() {
 			BeforeEach(func() {
-				acceptString = "application/json"
+				headers = header("Accept", "application/json")
 			})
 
 			It("returns a single entry", func() {
@@ -191,7 +192,7 @@ var _ = Describe("Accept", func() {
 			var expected silverback.Accept
 
 			BeforeEach(func() {
-				acceptString = "application/json, text/xml"
+				headers = header("Accept", "application/json, text/xml")
 				jsonEntry := silverback.ParseAcceptEntry("application/json")
 				xmlEntry := silverback.ParseAcceptEntry("text/xml")
 				expected = silverback.Accept{jsonEntry, xmlEntry}
@@ -202,6 +203,26 @@ var _ = Describe("Accept", func() {
 
 			It("returns multiple entries", func() {
 				Expect(accept).To(HaveLen(2))
+				Expect(accept).To(BeEquivalentTo(expected))
+			})
+		})
+
+		Context("Multiple Headers", func() {
+			var expected silverback.Accept
+
+			BeforeEach(func() {
+				headers = header("Accept", "application/json, text/xml", "text/html")
+				jsonEntry := silverback.ParseAcceptEntry("application/json")
+				xmlEntry := silverback.ParseAcceptEntry("text/xml")
+				htmlEntry := silverback.ParseAcceptEntry("text/html")
+				expected = silverback.Accept{jsonEntry, xmlEntry, htmlEntry}
+				// again, we need to ensure all values that are
+				// assigned during sorting are assigned here.
+				sort.Sort(expected)
+			})
+
+			It("handles multiple header entries", func() {
+				Expect(accept).To(HaveLen(3))
 				Expect(accept).To(BeEquivalentTo(expected))
 			})
 		})
@@ -220,7 +241,7 @@ var _ = Describe("Accept", func() {
 			BeforeEach(func() {
 				// Avoid any ambiguous sorting - nothing at the same
 				// quality with the same specificity.
-				acceptString = "image/*; q=0.3, text/html; q=0.8, image/jpeg; q=0.3, application/json, text/xml; q=0.9, text/*; q=0.9, */*; q=0.3"
+				headers = header("Accept", "image/*; q=0.3, text/html; q=0.8, image/jpeg; q=0.3, application/json, text/xml; q=0.9, text/*; q=0.9, */*; q=0.3")
 			})
 
 			It("sorts the accept header according to RFC 2616", func() {
@@ -308,3 +329,9 @@ var _ = Describe("Accept", func() {
 		})
 	})
 })
+
+func header(key string, values ...string) http.Header {
+	return http.Header{
+		key: values,
+	}
+}

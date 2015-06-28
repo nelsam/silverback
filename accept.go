@@ -1,6 +1,7 @@
 package silverback
 
 import (
+	"net/http"
 	"sort"
 	"strconv"
 	"strings"
@@ -188,12 +189,18 @@ func runeSplit(value string, split rune) []string {
 	return values
 }
 
-// ParseAcceptHeader parses an Accept header value into a *Accept.
-func ParseAcceptHeader(acceptHeader string) Accept {
-	if acceptHeader == "" {
+// ParseAcceptHeader loads the Accept header(s) from an http.Header
+// value, then parses it into an Accept value.
+func ParseAcceptHeader(header http.Header) Accept {
+	acceptHeaders, ok := header[http.CanonicalHeaderKey("Accept")]
+	if !ok {
 		return nil
 	}
-	entries := strings.FieldsFunc(acceptHeader, isAcceptSplit)
+	entries := make([]string, 0, len(acceptHeaders))
+	for _, acceptHeader := range acceptHeaders {
+		newEntries := strings.FieldsFunc(acceptHeader, isAcceptSplit)
+		entries = append(entries, newEntries...)
+	}
 	accept := make(Accept, 0, len(entries))
 	for _, entry := range entries {
 		entry = strings.TrimSpace(entry)

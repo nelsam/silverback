@@ -45,7 +45,7 @@ func NewResponseForCodecs(r *http.Request, codecs []Codec) *Response {
 // Codec returns the codec that will be used for this response.
 func (r *Response) Codec() Codec {
 	if r.codec == nil {
-		accept := ParseAcceptHeader(r.request.Header.Get("Accept"))
+		accept := ParseAcceptHeader(r.request.Header)
 		r.codec = accept.Codec(r.codecs)
 	}
 	return r.codec
