@@ -16,6 +16,12 @@ type Router struct {
 	codecs []Codec
 }
 
+func NewRouter() *Router {
+	return &Router{
+		Router: *mux.NewRouter(),
+	}
+}
+
 func (r *Router) setupIDPaths(handler Handler) {
 	idRoutePath := path.Join(handler.Path(), "{id}")
 
