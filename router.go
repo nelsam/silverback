@@ -51,33 +51,33 @@ func (r *Router) setupIDPaths(handler Handler) {
 			subRouter.Methods("GET").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
 				h := handler.New(req).(Getter)
 				resp := idHandle(h, h.Get, mux.Vars(req)["id"])
-				writeResponse(writer, resp, r.codecs)
+				WriteResponse(writer, resp, r.codecs)
 			})
 			subRouter.Methods("HEAD").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
 				h := handler.New(req).(Getter)
 				resp := idHandle(h, h.Get, mux.Vars(req)["id"])
-				writeHead(writer, resp, r.codecs)
+				WriteHead(writer, resp, r.codecs)
 			})
 		}
 		if hasPutter {
 			subRouter.Methods("PUT").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
 				h := handler.New(req).(Putter)
 				resp := idHandle(h, h.Put, mux.Vars(req)["id"])
-				writeResponse(writer, resp, r.codecs)
+				WriteResponse(writer, resp, r.codecs)
 			})
 		}
 		if hasPatcher {
 			subRouter.Methods("PATCH").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
 				h := handler.New(req).(Patcher)
 				resp := idHandle(h, h.Patch, mux.Vars(req)["id"])
-				writeResponse(writer, resp, r.codecs)
+				WriteResponse(writer, resp, r.codecs)
 			})
 		}
 		if hasDeleter {
 			subRouter.Methods("DELETE").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
 				h := handler.New(req).(Deleter)
 				resp := idHandle(h, h.Delete, mux.Vars(req)["id"])
-				writeResponse(writer, resp, r.codecs)
+				WriteResponse(writer, resp, r.codecs)
 			})
 		}
 		route.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
@@ -108,19 +108,19 @@ func (r *Router) setupNonIDPaths(handler Handler) {
 			subRouter.Methods("GET").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
 				h := handler.New(req).(Querier)
 				resp := handle(h, h.Query)
-				writeResponse(writer, resp, r.codecs)
+				WriteResponse(writer, resp, r.codecs)
 			})
 			subRouter.Methods("HEAD").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
 				h := handler.New(req).(Querier)
 				resp := handle(h, h.Query)
-				writeHead(writer, resp, r.codecs)
+				WriteHead(writer, resp, r.codecs)
 			})
 		}
 		if hasPoster {
 			subRouter.Methods("POST").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
 				h := handler.New(req).(Poster)
 				resp := handle(h, h.Post)
-				writeResponse(writer, resp, r.codecs)
+				WriteResponse(writer, resp, r.codecs)
 			})
 		}
 		route.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
@@ -179,7 +179,7 @@ func idHandle(h Handler, f func(string) *Response, id string) *Response {
 	return resp
 }
 
-func writeHeaders(writer http.ResponseWriter, resp *Response) {
+func WriteHeaders(writer http.ResponseWriter, resp *Response) {
 	for name, values := range resp.Headers {
 		for _, v := range values {
 			writer.Header().Add(name, v)
@@ -187,8 +187,8 @@ func writeHeaders(writer http.ResponseWriter, resp *Response) {
 	}
 }
 
-func writeHead(writer http.ResponseWriter, resp *Response, codecs []Codec) (body []byte) {
-	writeHeaders(writer, resp)
+func WriteHead(writer http.ResponseWriter, resp *Response, codecs []Codec) (body []byte) {
+	WriteHeaders(writer, resp)
 	writer.WriteHeader(resp.Status)
 	if resp.codecs == nil {
 		resp.codecs = codecs
@@ -201,11 +201,17 @@ func writeHead(writer http.ResponseWriter, resp *Response, codecs []Codec) (body
 		return
 	}
 	writer.Header().Set("Content-Length", strconv.Itoa(len(body)))
+	if resp.Status == http.StatusOK {
+		// For HEAD requests, the norm is StatusNoContent; however, we
+		// don't want to overwrite error states, redirects, or other
+		// statuses.  To avoid that, we only overwrite StatusOK.
+		resp.Status = http.StatusNoContent
+	}
 	writer.WriteHeader(resp.Status)
 	return body
 }
 
-func writeResponse(writer http.ResponseWriter, resp *Response, codecs []Codec) {
-	body := writeHead(writer, resp, codecs)
+func WriteResponse(writer http.ResponseWriter, resp *Response, codecs []Codec) {
+	body := WriteHead(writer, resp, codecs)
 	writer.Write(body)
 }
