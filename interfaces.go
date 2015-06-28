@@ -5,7 +5,7 @@ import "net/http"
 // A Handler is expected to be able to take a request and return a
 // copy of itself based on that request.
 type Handler interface {
-	New(*http.Request) interface{}
+	New(*http.Request) Handler
 	Path() string
 }
 
