@@ -6,6 +6,7 @@ import (
 	"path"
 	"strconv"
 
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
 
@@ -23,110 +24,69 @@ func NewRouter() *Router {
 }
 
 func (r *Router) setupIDPaths(handler Handler) {
-	idRoutePath := path.Join(handler.Path(), "{id}")
-
-	_, hasGetter := handler.(Getter)
-	_, hasPutter := handler.(Putter)
-	_, hasPatcher := handler.(Patcher)
-	_, hasDeleter := handler.(Deleter)
-	var idAllowed []string
-	if hasGetter {
-		idAllowed = append(idAllowed, "GET", "HEAD")
-	}
-	if hasPutter {
-		idAllowed = append(idAllowed, "PUT")
-	}
-	if hasPatcher {
-		idAllowed = append(idAllowed, "PATCH")
-	}
-	if hasDeleter {
-		idAllowed = append(idAllowed, "DELETE")
-	}
-	if len(idAllowed) > 0 {
-		idAllowed = append(idAllowed, "OPTIONS")
-		route := r.Path(idRoutePath)
-		subRouter := route.Subrouter()
-		subRouter.Methods("OPTIONS").HandlerFunc(optionsHandler(idAllowed))
-		if hasGetter {
-			subRouter.Methods("GET").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
-				h := handler.New(req).(Getter)
-				resp := idHandle(h, h.Get, mux.Vars(req)["id"])
-				WriteResponse(writer, resp, r.codecs)
-			})
-			subRouter.Methods("HEAD").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
-				h := handler.New(req).(Getter)
-				resp := idHandle(h, h.Get, mux.Vars(req)["id"])
-				WriteHead(writer, resp, r.codecs)
-			})
-		}
-		if hasPutter {
-			subRouter.Methods("PUT").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
-				h := handler.New(req).(Putter)
-				resp := idHandle(h, h.Put, mux.Vars(req)["id"])
-				WriteResponse(writer, resp, r.codecs)
-			})
-		}
-		if hasPatcher {
-			subRouter.Methods("PATCH").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
-				h := handler.New(req).(Patcher)
-				resp := idHandle(h, h.Patch, mux.Vars(req)["id"])
-				WriteResponse(writer, resp, r.codecs)
-			})
-		}
-		if hasDeleter {
-			subRouter.Methods("DELETE").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
-				h := handler.New(req).(Deleter)
-				resp := idHandle(h, h.Delete, mux.Vars(req)["id"])
-				WriteResponse(writer, resp, r.codecs)
-			})
-		}
-		route.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
-			writeAllowHeader(idAllowed, writer)
-			writer.WriteHeader(http.StatusMethodNotAllowed)
+	h := make(handlers.MethodHandler, 5)
+	if _, hasGetter := handler.(Getter); hasGetter {
+		h["GET"] = http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+			h := handler.New(req).(Getter)
+			resp := idHandle(h, h.Get, mux.Vars(req)["id"])
+			WriteResponse(writer, resp, r.codecs)
 		})
+		h["HEAD"] = http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+			h := handler.New(req).(Getter)
+			resp := idHandle(h, h.Get, mux.Vars(req)["id"])
+			WriteHead(writer, resp, r.codecs)
+		})
+	}
+	if _, hasPutter := handler.(Putter); hasPutter {
+		h["PUT"] = http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+			h := handler.New(req).(Putter)
+			resp := idHandle(h, h.Put, mux.Vars(req)["id"])
+			WriteResponse(writer, resp, r.codecs)
+		})
+	}
+	if _, hasPatcher := handler.(Patcher); hasPatcher {
+		h["PATCH"] = http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+			h := handler.New(req).(Patcher)
+			resp := idHandle(h, h.Patch, mux.Vars(req)["id"])
+			WriteResponse(writer, resp, r.codecs)
+		})
+	}
+	if _, hasDeleter := handler.(Deleter); hasDeleter {
+		h["DELETE"] = http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+			h := handler.New(req).(Deleter)
+			resp := idHandle(h, h.Delete, mux.Vars(req)["id"])
+			WriteResponse(writer, resp, r.codecs)
+		})
+	}
+	if len(h) > 0 {
+		idRoutePath := path.Join(handler.Path(), "{id}")
+		r.Path(idRoutePath).Handler(h)
 	}
 }
 
 func (r *Router) setupNonIDPaths(handler Handler) {
-	routePath := handler.Path()
-
-	_, hasQuerier := handler.(Querier)
-	_, hasPoster := handler.(Poster)
-	var allowed []string
-	if hasQuerier {
-		allowed = append(allowed, "GET", "HEAD")
-	}
-	if hasPoster {
-		allowed = append(allowed, "POST")
-	}
-	if len(allowed) > 0 {
-		allowed = append(allowed, "OPTIONS")
-		route := r.Path(routePath)
-		subRouter := route.Subrouter()
-		subRouter.Methods("OPTIONS").HandlerFunc(optionsHandler(allowed))
-		if hasQuerier {
-			subRouter.Methods("GET").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
-				h := handler.New(req).(Querier)
-				resp := handle(h, h.Query)
-				WriteResponse(writer, resp, r.codecs)
-			})
-			subRouter.Methods("HEAD").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
-				h := handler.New(req).(Querier)
-				resp := handle(h, h.Query)
-				WriteHead(writer, resp, r.codecs)
-			})
-		}
-		if hasPoster {
-			subRouter.Methods("POST").HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
-				h := handler.New(req).(Poster)
-				resp := handle(h, h.Post)
-				WriteResponse(writer, resp, r.codecs)
-			})
-		}
-		route.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
-			writeAllowHeader(allowed, writer)
-			writer.WriteHeader(http.StatusMethodNotAllowed)
+	h := make(handlers.MethodHandler, 3)
+	if _, hasQuerier := handler.(Querier); hasQuerier {
+		h["GET"] = http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+			h := handler.New(req).(Querier)
+			resp := handle(h, h.Query)
+			WriteResponse(writer, resp, r.codecs)
 		})
+		h["HEAD"] = http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+			h := handler.New(req).(Querier)
+			resp := handle(h, h.Query)
+			WriteHead(writer, resp, r.codecs)
+		})
+	}
+	if _, hasPoster := handler.(Poster); hasPoster {
+		h["POST"] = http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
+			h := handler.New(req).(Poster)
+			resp := handle(h, h.Post)
+			WriteResponse(writer, resp, r.codecs)
+		})
+	}
+	if len(h) > 0 {
+		r.Path(handler.Path()).Handler(h)
 	}
 }
 
@@ -137,8 +97,8 @@ func (r *Router) AddCodec(codec Codec) {
 	r.codecs = append(r.codecs, codec)
 }
 
-// Route routes the methods on Handler to paths, based on the
-// Handler's Path().
+// Route routes the methods on handler to paths, based on handler's
+// Path().
 func (r *Router) Route(handler Handler) {
 	r.setupIDPaths(handler)
 	r.setupNonIDPaths(handler)
