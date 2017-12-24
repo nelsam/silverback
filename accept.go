@@ -1,6 +1,7 @@
 package silverback
 
 import (
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -15,12 +16,32 @@ func (o Options) Add(key, value string) {
 	o[strings.TrimSpace(key)] = strings.TrimSpace(value)
 }
 
+func (o Options) String() string {
+	values := make([]string, 0, len(o))
+	for k, v := range o {
+		value := k
+		if v != "" {
+			value += "=" + v
+		}
+		values = append(values, value)
+	}
+	return strings.Join(values, "; ")
+}
+
 // MIMEType stores a full MIME type for Accept and Content-Type
 // headers.
 type MIMEType struct {
 	Type    string
 	SubType string
 	Options Options
+}
+
+func (m MIMEType) String() string {
+	typ := fmt.Sprintf("%s/%s", m.Type, m.SubType)
+	if len(m.Options) == 0 {
+		return typ
+	}
+	return fmt.Sprintf("%s;%s", typ, m.Options)
 }
 
 // ParseMIMEType parses a MIME type entry, such as from a Content-Type
